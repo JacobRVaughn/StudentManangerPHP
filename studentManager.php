@@ -38,6 +38,28 @@ function promptBoolean(string $message): bool {
     }
 }
 
+// Gets the all student data from JSON File 
+// No params 
+// returns array of students and their data
+function getStdArr() {
+    global $jsonFile;
+
+    // Read the existing JSON file
+    $jsonContent = file_get_contents($jsonFile);
+    if ($jsonContent === false) {
+        throw new Exception("Unable to read JSON file.");
+    }
+
+    // Decode JSON into PHP array
+    $dataArray = json_decode($jsonContent, true);
+    if (!is_array($dataArray)) {
+        // If file is empty or invalid JSON, reset to empty array
+        $dataArray = [];
+    }
+
+    return $dataArray;
+}
+
 function addStudent($name,$age,$isStudent) {
     $newData = [
     "name" => $name,
@@ -54,18 +76,7 @@ function addStudent($name,$age,$isStudent) {
             file_put_contents($jsonFile, json_encode([], JSON_PRETTY_PRINT));
         }
 
-        // Read the existing JSON file
-        $jsonContent = file_get_contents($jsonFile);
-        if ($jsonContent === false) {
-            throw new Exception("Unable to read JSON file.");
-        }
-
-        // Decode JSON into PHP array
-        $dataArray = json_decode($jsonContent, true);
-        if (!is_array($dataArray)) {
-            // If file is empty or invalid JSON, reset to empty array
-            $dataArray = [];
-        }
+        $dataArray = getStdArr();
 
         // Append new data
         $dataArray[] = $newData;
@@ -76,27 +87,14 @@ function addStudent($name,$age,$isStudent) {
             throw new Exception("Unable to write to JSON file.");
         }
 
-        echo "Data successfully added to JSON file.";
+        echo "Data successfully added to JSON file.\n";
     } catch (Exception $e) {
         echo "Error: " . $e->getMessage();
     }
 }
 
 function viewStudents() {
-    global $jsonFile;
-
-    // Read the existing JSON file
-    $jsonContent = file_get_contents($jsonFile);
-    if ($jsonContent === false) {
-        throw new Exception("Unable to read JSON file.");
-    }
-
-    // Decode JSON into PHP array
-    $dataArray = json_decode($jsonContent, true);
-    if (!is_array($dataArray)) {
-        // If file is empty or invalid JSON, reset to empty array
-        $dataArray = [];
-    }
+    $dataArray = getStdArr();
 
     foreach ($dataArray as $index => $student) {
         echo ($index + 1) . ". " . $student["name"] 
@@ -106,25 +104,64 @@ function viewStudents() {
     }
 }
 
+// returns the avg age or 0 if no data
+function getAvgAge() {
+    $students = getStdArr();
+
+    $count = 0;
+    $sum = 0;
+    foreach($students as $student) {
+        $sum += $student["age"];
+        $count++;
+    }
+    
+    if ($count === 0) {
+        return 0;
+    }
+    return $sum / $count;
+}
+
+// returns the count of adults in the student.json file
+function getAdltCount() {
+    $students = getStdArr();
+
+    $count = 0;
+    foreach($students as $student) { 
+        if ($student["age"] > 17) {
+            $count++;
+        }
+    }
+    return $count;
+}
+
+// function returns the count of all in student array with isStudent === true
+function getStdCount() {
+    $students = getStdArr();
+
+    $count = 0;
+    foreach($students as $student) { 
+        if ($student["isStudent"]) $count++;
+    }
+    return $count;
+}
+
 function deleteStudent() {
     viewStudents();
     $studentNum = readline("which number student would you like to delete: ");
 
     global $jsonFile;
 
-    // Read the existing JSON file
-    $jsonContent = file_get_contents($jsonFile);
-    if ($jsonContent === false) {
-        throw new Exception("Unable to read JSON file.");
-    }
+    $dataArray = getStdArr();
 
-    $dataArray = json_decode($jsonContent, true);
-    if (!is_array($dataArray)) {
-        $dataArray = [];
+    $index = (int)$studentNum - 1;
+
+    if (!isset($dataArray[$index])) {
+        echo "Invalid student number.\n";
+        return;
     }
 
     // remove the student entry from array
-    unset($dataArray[$studentNum - 1]);
+    unset($dataArray[$index]);
     $dataArray = array_values($dataArray);
 
     try {
@@ -138,12 +175,30 @@ function deleteStudent() {
     } catch (Exception $e) {
         echo "Error: " . $e->getMessage();
     }
+}
 
-
+// Function starts a stats CLI loop for the user to request a certain stat or back out
+function stats() {
+    while (true) {
+        $statAction = strtolower(readline("Type which stat [average age, count adults, count students, back]: "));
+        
+        if ($statAction === "back") {
+        break;
+        } elseif ($statAction === "average age") {
+            $avgAge = getAvgAge();
+            echo "Average Age: " . $avgAge . "\n";
+        } elseif ($statAction === "count adults") {
+            $countAdlt = getAdltCount();
+            echo "Count of Adults: " . $countAdlt . "\n";
+        } elseif ($statAction === "count students") {
+            $countStd = getStdCount();
+            echo "Count of Students: " . $countStd . "\n";
+        }
+    }
 }
 
 while (true) {
-    $action = strtolower(readline("Type action [view, add, delete, exit]: "));
+    $action = strtolower(readline("Type action [view, add, delete, stats, exit]: "));
 
     if ($action === "exit") {
         echo "Goodbye!\n";
@@ -157,6 +212,8 @@ while (true) {
         viewStudents();
     } elseif ($action === "delete") {
         deleteStudent();
+    } elseif ($action === "stats") {
+        stats();
     } else {
         echo "Invalid action. Try again.\n";
     }
