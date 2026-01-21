@@ -44,6 +44,11 @@ function promptBoolean(string $message): bool {
 function getStdArr() {
     global $jsonFile;
 
+    // safeguard for when file doesn't exist
+    if (!file_exists($jsonFile)) {
+        return [];
+    }
+
     // Read the existing JSON file
     $jsonContent = file_get_contents($jsonFile);
     if ($jsonContent === false) {
@@ -104,6 +109,7 @@ function viewStudents() {
     }
 }
 
+
 // returns the avg age or 0 if no data
 function getAvgAge() {
     $students = getStdArr();
@@ -145,6 +151,67 @@ function getStdCount() {
     return $count;
 }
 
+// function returns all students that are adults and have isStudent true
+function getStdAdltCount() {
+    $students = getStdArr();
+
+    $count = 0;
+    foreach($students as $student) {
+        if ($student["isStudent"] && $student["age"] > 17) $count++;
+    }
+    return $count;
+}
+
+/**
+ * Save an associative array to a CSV file
+ * Handles UTF-8 encoding, special characters, and proper escaping
+ */
+
+function saveAssocArrayToCSV(array $data, string $filename): bool {
+    // Validate that the array is not empty
+    if (empty($data)) {
+        throw new InvalidArgumentException("Data array is empty.");
+    }
+
+    // Ensure all elements are associative arrays
+    foreach ($data as $row) {
+        if (!is_array($row) || array_keys($row) === range(0, count($row) - 1)) {
+            throw new InvalidArgumentException("Each row must be an associative array.");
+        }
+    }
+
+    // Open file for writing
+    $fp = fopen($filename, 'w');
+    if ($fp === false) {
+        throw new RuntimeException("Unable to open file: $filename");
+    }
+
+    // Write UTF-8 BOM for Excel compatibility
+    fwrite($fp, "\xEF\xBB\xBF");
+
+    // Write header row (keys from the first row)
+    fputcsv($fp, array_keys($data[0]));
+
+    // Write each row of data
+    foreach ($data as $row) {
+        fputcsv($fp, $row);
+    }
+
+    fclose($fp);
+    return true;
+}
+
+// function generates a csv file based on current json data
+// csv files is generated in the exportData folder
+function genCSV() {
+    $students = getStdArr();
+
+    $file = "exportData/studentData.csv";
+
+    saveAssocArrayToCSV($students, $file);
+
+}
+
 function deleteStudent() {
     viewStudents();
     $studentNum = readline("which number student would you like to delete: ");
@@ -180,7 +247,7 @@ function deleteStudent() {
 // Function starts a stats CLI loop for the user to request a certain stat or back out
 function stats() {
     while (true) {
-        $statAction = strtolower(readline("Type which stat [average age, count adults, count students, back]: "));
+        $statAction = strtolower(readline("Type which stat [average age, count adults, count students, count student adults, back]: "));
         
         if ($statAction === "back") {
         break;
@@ -193,12 +260,27 @@ function stats() {
         } elseif ($statAction === "count students") {
             $countStd = getStdCount();
             echo "Count of Students: " . $countStd . "\n";
+        } elseif ($statAction === "count student adults") {
+            $countStdAdlt = getStdAdltCount();
+            echo "Count of Students Adults: " . $countStdAdlt . "\n";
+        }
+    }
+}
+
+function export() {
+    while (true) {
+        $exportAction = strtolower(readline("Type which export option [gen csv, gen excel, back]"));
+
+        if ($exportAction === "back") {
+            break;
+        } elseif ($exportAction === "gen csv") {
+            genCSV();
         }
     }
 }
 
 while (true) {
-    $action = strtolower(readline("Type action [view, add, delete, stats, exit]: "));
+    $action = strtolower(readline("Type action [view, add, delete, stats, export, exit]: "));
 
     if ($action === "exit") {
         echo "Goodbye!\n";
@@ -214,7 +296,10 @@ while (true) {
         deleteStudent();
     } elseif ($action === "stats") {
         stats();
-    } else {
+    } elseif ($action === "export") {
+        export();
+    }
+    else {
         echo "Invalid action. Try again.\n";
     }
 }
